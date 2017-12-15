@@ -57,6 +57,9 @@ class radarrelay(Exchange):
             'wallet':''
         })
 
+    def set_wallet(self):
+        pass
+
     def fetch_markets(self):
         response = self.public_get_token_pairs()
         result = []
@@ -268,7 +271,7 @@ class radarrelay(Exchange):
 
         return pending, leftover
 
-    def create_order(self, symbol, style, side, amount, price=None, params={}):
+    def create_order(self, symbol, style, side, amount, price=None, time_ex=None, params={}):
         if type(self.wallet) is list:
             pass
         else:
@@ -276,7 +279,10 @@ class radarrelay(Exchange):
 
         if style == 'limit' and price == None:
             raise InvalidOrder("Price must be specified in limit order")
-        elif style == 'market' and side == 'buy':
+        elif style == 'limit' and time_ex == None:
+            raise InvalidOrder("Time to expiration must be specified for limit orders")
+
+        if style == 'market' and side == 'buy':
             price = float('inf')
         elif style == 'market' and side == 'sell':
             price = 0
@@ -286,9 +292,9 @@ class radarrelay(Exchange):
 
         if leftover != 0:
             if side == 'buy':
-                response, order_hash = self._buy_post(symbol, leftover, price, params)
+                response, order_hash = self._buy_post(symbol, leftover, price, time_ex, params)
             elif side == 'sell':
-                response, order_hash = self._sell_post(symbol, leftover, price, params)
+                response, order_hash = self._sell_post(symbol, leftover, price, time_ex, params)
         else:
             response, order_hash = '', ''
 
@@ -302,7 +308,7 @@ class radarrelay(Exchange):
     def _fill_order(self, amount, ticket):
         pass
 
-    def _buy_post(self, symbol, amount, price, params={}):
+    def _buy_post(self, symbol, amount, price, time_ex, params={}):
         self.load_markets()
         market = self.market(symbol)
 
@@ -320,7 +326,7 @@ class radarrelay(Exchange):
             "takerTokenAddress": market['baseTokenAddress'],
             "makerTokenAmount": str(makerAmount),
             "takerTokenAmount": str(takerAmount),
-            "expirationUnixTimestampSec":str(self.milliseconds() + 300000),
+            "expirationUnixTimestampSec":str(self.milliseconds() + time_ex*60000),
             "salt": ""
         }
 
@@ -334,7 +340,7 @@ class radarrelay(Exchange):
         out = self.public_post_order(params, body=json.dumps(order)) ###error handling
         return out, order_hash
 
-    def _sell_post(self, symbol, amount, price, params={}):
+    def _sell_post(self, symbol, amount, price, time_ex, params={}):
         self.load_markets()
         market = self.market(symbol)
 
@@ -352,7 +358,7 @@ class radarrelay(Exchange):
             "takerTokenAddress": market['quoteTokenAddress'],
             "makerTokenAmount": str(makerAmount),
             "takerTokenAmount": str(takerAmount),
-            "expirationUnixTimestampSec":str(self.milliseconds + 300000),
+            "expirationUnixTimestampSec":str(self.milliseconds + time_ex*60000),
             "salt": ""
         }
 
@@ -365,6 +371,12 @@ class radarrelay(Exchange):
 
         out = self.public_post_order(params, body=json.dumps(order)) ###error handling
         return out, order_hash
+
+    def create_limit_buy_order(self, symbol, amount, price, time_ex):
+        return self.create_order(symbol, 'limit', 'buy', amount=amount, price=price, time_ex=time_ex)
+
+    def create_limit_sell_order(self, symbol, amount, price, time_ex):
+        return self.create_order(symbol, 'limit', 'sell', amount=amount, price=price, time_ex=time_ex)
 
     def cancel_order(self, order_id, params={}):
         pass
