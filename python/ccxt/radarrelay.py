@@ -60,6 +60,12 @@ class radarrelay(Exchange):
     def set_wallet(self):
         pass
 
+    def check_wallet(self):
+        if type(self.wallet) is list and len(self.wallet) != 0:
+            pass
+        else:
+            raise AttributeError("Wallet(s) must be linked for this function. Set exchange.wallet=address")
+
     def fetch_markets(self):
         response = self.public_get_token_pairs()
         result = []
@@ -145,10 +151,7 @@ class radarrelay(Exchange):
         ####MUST get a tickers endpoint in API
 
     def fetch_balance(self, params={}):
-        if type(self.wallet) is list:
-            pass
-        else:
-            raise AttributeError("Wallet(s) must be linked for this function. Set exchange.wallet=address")
+        self.check_wallet()
 
         balances = {}
         for address in self.wallet:
@@ -167,10 +170,7 @@ class radarrelay(Exchange):
         return self.parse_order(response)
 
     def fetch_orders(self, symbol=None, params={}):
-        if type(self.wallet) is list:
-            pass
-        else:
-            raise AttributeError("Wallet(s) must be linked for this function. Set exchange.wallet=address")
+        self.check_wallet()
 
         if symbol is None:
             request = {'trader': self.wallet[0]}
@@ -188,10 +188,7 @@ class radarrelay(Exchange):
         return orders
 
     def fetch_open_orders(self, symbol=None, params={}):
-        if type(self.wallet) is list:
-            pass
-        else:
-            raise AttributeError("Wallet(s) must be linked for this function. Set exchange.wallet=address")
+        self.check_wallet()
 
         if symbol is None:
             request = {'trader': self.wallet[0]}
@@ -213,10 +210,7 @@ class radarrelay(Exchange):
         return out
 
     def fetch_closed_orders(self, symbol=None, params={}):
-        if type(self.wallet) is list:
-            pass
-        else:
-            raise AttributeError("Wallet(s) must be linked for this function. Set exchange.wallet=address")
+        self.check_wallet()
 
         if symbol is None:
             request = {'trader': self.wallet[0]}
@@ -272,10 +266,7 @@ class radarrelay(Exchange):
         return pending, leftover
 
     def create_order(self, symbol, style, side, amount, price=None, time_ex=None, params={}):
-        if type(self.wallet) is list:
-            pass
-        else:
-            raise AttributeError("Wallet(s) must be linked for this function. Set exchange.wallet=address")
+        self.check_wallet()
 
         if style == 'limit' and price == None:
             raise InvalidOrder("Price must be specified in limit order")
