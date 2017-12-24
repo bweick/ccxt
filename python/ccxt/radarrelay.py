@@ -78,9 +78,9 @@ class radarrelay(Exchange):
         result = []
         for pair in response:
             precision = {
-                'amount': 10**min(int(pair['tokenB']['precision']), int(pair['tokenA']['precision']))
+                'amount': 10**min(int(pair['tokenB']['precision']), int(pair['tokenA']['precision'])),
                 'amountBase': 10**int(pair['tokenB']['precision']),
-                'amountQuote':10**int(pair['tokenA']['precision'])
+                'amountQuote':10**int(pair['tokenA']['precision']),
                 'price': pair['tokenA']['precision']
             }
             limits = {
@@ -101,7 +101,7 @@ class radarrelay(Exchange):
             base_symbol = self.get_symbol(pair['tokenB']['address'])
             quote_symbol = self.get_symbol(pair['tokenA']['address'])
             asset = {
-                'id':'',
+                'id': base_symbol + '/' + quote_symbol,
                 'symbol':base_symbol + '/' + quote_symbol,
                 'base': base_symbol,
                 'baseTokenAddress': pair['tokenB']['address'],
