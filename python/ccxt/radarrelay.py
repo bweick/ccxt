@@ -321,8 +321,8 @@ class radarrelay(Exchange):
         self.load_markets()
         market = self.market(symbol)
 
-        takerAmount = amount*(10**18)
-        makerAmount = takerAmount*price
+        takerAmount = amount*market['precision']['baseAmount']
+        makerAmount = amount*price*market['precision']['quoteAmount']
 
         ##get exchangeContractAddress
         ##get salt
@@ -353,8 +353,8 @@ class radarrelay(Exchange):
         self.load_markets()
         market = self.market(symbol)
 
-        makerAmount = amount*(10**18)
-        takerAmount = makerAmount*price
+        makerAmount = amount*market['precision']['baseAmount']
+        takerAmount = amount*price*market['precision']['quoteAmount']
 
         ##get exchangeContractAddress
         ##get salt
