@@ -8,11 +8,15 @@ from ccxt.base.errors import BaseError, InvalidOrder
 
 class radarrelay(Exchange):
 
+    def __init__(self):
+        #self.exchange =
+        pass
+
     def describe(self):
         return self.deep_extend(super(radarrelay, self).describe(), {
             'id': 'radarrelay',
             'name': 'RadarRelay',
-            'countries': 'US',  # China
+            'countries': 'US',
             'rateLimit': 500,
             'hasCORS': False,
             # obsolete metainfo interface
@@ -66,12 +70,17 @@ class radarrelay(Exchange):
         else:
             raise AttributeError("Wallet(s) must be linked for this function. Set exchange.wallet=address")
 
+    def get_symbol(address):
+        pass
+
     def fetch_markets(self):
         response = self.public_get_token_pairs()
         result = []
         for pair in response:
             precision = {
-                'amount': pair['tokenB']['precision'],
+                'amount': min(pair['tokenB']['precision'], pair['tokenA']['precision'])
+                'amountBase': pair['tokenB']['precision'],
+                'amountQuote':pair['tokenA']['precision']
                 'price': pair['tokenA']['precision']
             }
             limits = {
@@ -89,12 +98,14 @@ class radarrelay(Exchange):
                 }
             }
 
+            base_symbol = self.get_symbol(pair['tokenB']['address'])
+            quote_symbol = self.get_symbol(pair['tokenA']['address'])
             asset = {
                 'id':'',
-                'symbol':'',
-                'base':'',
+                'symbol':base_symbol + '/' + quote_symbol,
+                'base': base_symbol,
                 'baseTokenAddress': pair['tokenB']['address'],
-                'quote':'',
+                'quote':quote_symbol,
                 'quoteTokenAddress': pair['tokenA']['address'],
                 'precision': precision,
                 'limits': limits,
@@ -103,16 +114,19 @@ class radarrelay(Exchange):
             result.append(asset)
         return result
 
-    def parse_order_book(self, orderbook, timestamp):
+    def parse_order_book(self, market, orderbook, timestamp):
+        base_precision = int(market['precision']['amountBase'])
+        quote_precision = int(market['precision']['amountQuote'])
+
         bids, asks = [], []
         for bid in orderbook['bids']:
-            price = int(bid['makerTokenAmount'])/int(bid['takerTokenAmount'])
-            amount = int(bid['takerTokenAmount'])/10**18
+            price = (int(bid['makerTokenAmount'])/quote_precision)/(int(bid['takerTokenAmount'])/base_precision)
+            amount = int(bid['takerTokenAmount'])/base_precision
             bids.append([price, amount])
 
         for ask in orderbook['asks']:
-            price = int(ask['takerTokenAmount'])/int(ask['makerTokenAmount'])
-            amount = int(ask['makerTokenAmount'])/10**18
+            price = (int(ask['takerTokenAmount'])/quote_precision)/(int(ask['makerTokenAmount'])/base_precision)
+            amount = int(ask['makerTokenAmount'])/base_precision
             asks.append([price, amount])
 
         parsed_book = {
@@ -135,7 +149,7 @@ class radarrelay(Exchange):
         if raw:
             return orderbook
         else:
-            return self.parse_order_book(orderbook, timestamp)
+            return self.parse_order_book(market, orderbook, timestamp)
 
     def fetch_trades(self, symbol, since=None, limit=None, params={}):
         self.load_markets()
@@ -191,7 +205,7 @@ class radarrelay(Exchange):
         self.check_wallet()
 
         if symbol is None:
-            request = {'trader': self.wallet[0]}
+            request = {'maker': self.wallet[0]}
         else:
             self.load_markets()
             market = self.market(symbol)
