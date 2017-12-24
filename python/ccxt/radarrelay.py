@@ -78,9 +78,9 @@ class radarrelay(Exchange):
         result = []
         for pair in response:
             precision = {
-                'amount': min(pair['tokenB']['precision'], pair['tokenA']['precision'])
-                'amountBase': pair['tokenB']['precision'],
-                'amountQuote':pair['tokenA']['precision']
+                'amount': 10**min(int(pair['tokenB']['precision']), int(pair['tokenA']['precision']))
+                'amountBase': 10**int(pair['tokenB']['precision']),
+                'amountQuote':10**int(pair['tokenA']['precision'])
                 'price': pair['tokenA']['precision']
             }
             limits = {
@@ -245,35 +245,39 @@ class radarrelay(Exchange):
                 out.append(self.parse_order(order, symbol))
         return out
 
-    def _analyze_orderbook(self, side, price, amount):
-        amount = amount*(10**18)
-        leftover = amount
+    def _analyze_orderbook(self, symbol, side, price, amount):
+        self.load_markets()
+        market = self.market(symbol)
+        base_precision = market['precision']['amountBase']
+        quote_precision = market['precision']['amountQuote']
+
+        leftover = amount*base_precision
         pending = []
 
         if side == 'buy':
             for ask in self.order_bk['asks'][::-1]: ##Reversed order
-                if (int(ask['takerTokenAmount'])/int(ask['makerTokenAmount'])) <= price and leftover > 0:
+                if ((int(ask['takerTokenAmount'])/quote_precision)/(int(ask['makerTokenAmount'])/base_precision)) <= price and leftover > 0:
                     if int(ask['makerTokenAmount']) < leftover:
                         self._fill_order(int(ask['makerTokenAmount']), ask)
                         leftover -= int(ask['makerTokenAmount'])
-                        pending.append(ask['exchangeContractAddress'])
+                        pending.append(ask['exchangeContractAddress']) #stand in for tx_hash
                     else:
                         self._fill_order(leftover, ask)
                         leftover -= leftover
-                        pending.append(ask['exchangeContractAddress'])
+                        pending.append(ask['exchangeContractAddress']) #stand in for tx_hash
                 else:
                     break
         else:
             for bid in self.order_bk['bids'][::-1]: ##Reversed order
-                if (int(bid['makerTokenAmount'])/int(bid['takerTokenAmount'])) >= price and leftover > 0:
+                if ((int(bid['makerTokenAmount'])/quote_precision)/(int(bid['takerTokenAmount'])/base_precision)) >= price and leftover > 0:
                     if int(bid['takerTokenAmount']) < leftover:
                         self._fill_order(int(bid['takerTokenAmount']), bid)
                         leftover -= int(bid['takerTokenAmount'])
-                        pending.append(bid['exchangeContractAddress'])
+                        pending.append(bid['exchangeContractAddress']) #stand in for tx_hash
                     else:
                         self._fill_order(leftover, bid)
                         leftover -= leftover
-                        pending.append(bid['exchangeContractAddress'])
+                        pending.append(bid['exchangeContractAddress']) #stand in for tx_hash
                 else:
                     break
 
