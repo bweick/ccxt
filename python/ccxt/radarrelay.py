@@ -297,7 +297,7 @@ class radarrelay(Exchange):
             price = 0
 
         self.order_bk = self.fetch_order_book(symbol, params={}, raw=True)
-        pending, leftover = self._analyze_orderbook(side, price, amount)
+        pending, leftover = self._analyze_orderbook(symbol, side, price, amount)
 
         if leftover != 0:
             if side == 'buy':
