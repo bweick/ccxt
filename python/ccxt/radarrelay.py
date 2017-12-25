@@ -8,9 +8,10 @@ from ccxt.base.errors import BaseError, InvalidOrder
 
 class radarrelay(Exchange):
 
-    # def __init__(self):
-    #     #self.exchange =
-    #     pass
+    def __init__(self):
+        super().__init__()
+        #self.exchange =
+
 
     def describe(self):
         return self.deep_extend(super(radarrelay, self).describe(), {
