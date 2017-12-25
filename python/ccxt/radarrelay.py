@@ -8,9 +8,9 @@ from ccxt.base.errors import BaseError, InvalidOrder
 
 class radarrelay(Exchange):
 
-    def __init__(self):
-        #self.exchange =
-        pass
+    # def __init__(self):
+    #     #self.exchange =
+    #     pass
 
     def describe(self):
         return self.deep_extend(super(radarrelay, self).describe(), {
@@ -70,8 +70,8 @@ class radarrelay(Exchange):
         else:
             raise AttributeError("Wallet(s) must be linked for this function. Set exchange.wallet=address")
 
-    def get_symbol(address):
-        pass
+    def get_symbol(self, address):
+        return "test"
 
     def fetch_markets(self):
         response = self.public_get_token_pairs()
@@ -100,6 +100,7 @@ class radarrelay(Exchange):
 
             base_symbol = self.get_symbol(pair['tokenB']['address'])
             quote_symbol = self.get_symbol(pair['tokenA']['address'])
+
             asset = {
                 'id': base_symbol + '/' + quote_symbol,
                 'symbol':base_symbol + '/' + quote_symbol,
@@ -320,9 +321,8 @@ class radarrelay(Exchange):
     def _buy_post(self, symbol, amount, price, time_ex, params={}):
         self.load_markets()
         market = self.market(symbol)
-
-        takerAmount = amount*market['precision']['baseAmount']
-        makerAmount = amount*price*market['precision']['quoteAmount']
+        takerAmount = amount*market['precision']['amountBase']
+        makerAmount = amount*price*market['precision']['amountQuote']
 
         ##get exchangeContractAddress
         ##get salt
@@ -353,8 +353,8 @@ class radarrelay(Exchange):
         self.load_markets()
         market = self.market(symbol)
 
-        makerAmount = amount*market['precision']['baseAmount']
-        takerAmount = amount*price*market['precision']['quoteAmount']
+        makerAmount = amount*market['precision']['amountBase']
+        takerAmount = amount*price*market['precision']['amountQuote']
 
         ##get exchangeContractAddress
         ##get salt
