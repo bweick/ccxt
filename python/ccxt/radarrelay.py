@@ -302,7 +302,7 @@ class radarrelay(Exchange):
 
     def create_order(self, style, buy_token, buy_amount, pay_token, pay_amount=None, time_ex=None):
         '''
-        Assumed to be buying base currency at all times.
+        Assumed to be buying base currency at all times. Might require some reworking for sell_market_order.
         '''
         self.check_wallet()
 
@@ -311,10 +311,8 @@ class radarrelay(Exchange):
         elif style == 'limit' and time_ex == None:
             raise InvalidOrder("Time to expiration must be specified for limit orders")
 
-        if style == 'market' and side == 'buy':
+        if style == 'market':
             price = float('inf')
-        elif style == 'market' and side == 'sell':
-            price = 0
         else:
             price = pay_amount/buy_amount #price is quoted quote/base
 
