@@ -379,10 +379,25 @@ class radarrelay(Exchange):
         order = self.fetch_order(order_hash)
 
     def create_limit_buy_order(self, symbol, amount, price, time_ex):
-        return self.create_order(symbol, 'limit', 'buy', amount=amount, price=price, time_ex=time_ex)
+        self.load_markets()
+        market = self.market(symbol)
+        return self.create_order('limit', market['baseTokenAddress'], amount, market['quoteTokenAddress'], amount*price, 1)
 
     def create_limit_sell_order(self, symbol, amount, price, time_ex):
-        return self.create_order(symbol, 'limit', 'sell', amount=amount, price=price, time_ex=time_ex)
+        self.load_markets()
+        market = self.market(symbol)
+        return self.create_order('limit', market['quoteTokenAddress'], amount*price, market['baseTokenAddress'], amount, 1)
+
+    def create_market_buy_order(self, symbol, amount):
+        self.load_markets
+        market = self.market(symbol)
+        return self.create_order('market', market['baseTokenAddress'], amount, market['quoteTokenAddress'])
+
+    ##Give more thought to possible solutions to market sell order size problem (Not Finished)
+    def create_market_sell_order(self, symbol, amount):
+        self.load_markets
+        market = self.market(symbol)
+        return self.create_order('market', market['quoteTokenAddress'], amount, market['baseTokenAddress'])
 
     def sign(self, path, api='public', method='GET', params={}, headers=None, body=None):
         url = self.urls['api'][api]
