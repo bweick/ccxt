@@ -5,11 +5,11 @@ import json
 
 from ccxt.base.exchange import Exchange
 from ccxt.base.errors import BaseError, InvalidOrder
-from web3 import Web3
-from pymaker import Address
-from pymaker.zrx import ZrxExchange
-from pymaker.deployment import deploy_contract
-from pymaker.token import ERC20Token
+# from web3 import Web3
+# from pymaker import Address
+# from pymaker.zrx import ZrxExchange
+# from pymaker.deployment import deploy_contract
+# from pymaker.token import ERC20Token
 
 class radarrelay(Exchange):
 
@@ -195,8 +195,8 @@ class radarrelay(Exchange):
     def parse_order(self, response, symbol=None):
         return response
 
-    def fetch_order(self, order_id, params={}):
-        response = self.public_get_order(self.extend({'order_id':order_id}, params))
+    def fetch_order(self, order_hash, params={}):
+        response = self.public_get_order(self.extend({'order_hash':order_hash}, params))
         return self.parse_order(response)
 
     def fetch_orders(self, symbol=None, params={}):
@@ -281,48 +281,32 @@ class radarrelay(Exchange):
         # return out
         pass
 
-    def _analyze_orderbook(self, symbol, side, price, amount):
-        self.load_markets()
-        market = self.market(symbol)
-        base_precision = market['precision']['amountBase']
-        quote_precision = market['precision']['amountQuote']
-
-        leftover = amount*base_precision
+    def _analyze_orderbook(self, price, buy_amount, buy_precision, pay_precision):
+        leftover = buy_amount*buy_precision
         pending = []
 
-        if side == 'buy':
-            for ask in self.order_bk['asks'][::-1]: ##Reversed order
-                if ((int(ask['takerTokenAmount'])/quote_precision)/(int(ask['makerTokenAmount'])/base_precision)) <= price and leftover > 0:
-                    if int(ask['makerTokenAmount']) < leftover:
-                        self._fill_order(int(ask['makerTokenAmount']), ask)
-                        leftover -= int(ask['makerTokenAmount'])
-                        pending.append(ask['exchangeContractAddress']) #stand in for tx_hash
-                    else:
-                        self._fill_order(leftover, ask)
-                        leftover -= leftover
-                        pending.append(ask['exchangeContractAddress']) #stand in for tx_hash
+        for ask in self.order_bk['asks'][::-1]: ##Reversed order
+            if ((int(ask['takerTokenAmount'])/pay_precision)/(int(ask['makerTokenAmount'])/buy_precision)) <= price and leftover > 0:
+                if int(ask['makerTokenAmount']) < leftover:
+                    self._fill_order(int(ask['makerTokenAmount']), ask)
+                    leftover -= int(ask['makerTokenAmount'])
+                    pending.append(ask['exchangeContractAddress']) #stand in for tx_hash
                 else:
-                    break
-        else:
-            for bid in self.order_bk['bids'][::-1]: ##Reversed order
-                if ((int(bid['makerTokenAmount'])/quote_precision)/(int(bid['takerTokenAmount'])/base_precision)) >= price and leftover > 0:
-                    if int(bid['takerTokenAmount']) < leftover:
-                        self._fill_order(int(bid['takerTokenAmount']), bid)
-                        leftover -= int(bid['takerTokenAmount'])
-                        pending.append(bid['exchangeContractAddress']) #stand in for tx_hash
-                    else:
-                        self._fill_order(leftover, bid)
-                        leftover -= leftover
-                        pending.append(bid['exchangeContractAddress']) #stand in for tx_hash
-                else:
-                    break
+                    self._fill_order(leftover, ask)
+                    leftover -= leftover
+                    pending.append(ask['exchangeContractAddress']) #stand in for tx_hash
+            else:
+                break
 
-        return pending, leftover
+        return pending, leftover/buy_precision
 
-    def create_order(self, symbol, style, side, amount, price=None, time_ex=None, params={}):
+    def create_order(self, style, buy_token, buy_amount, pay_token, pay_amount=None, time_ex=None):
+        '''
+        Assumed to be buying base currency at all times.
+        '''
         self.check_wallet()
 
-        if style == 'limit' and price == None:
+        if style == 'limit' and pay_amount == None:
             raise InvalidOrder("Price must be specified in limit order")
         elif style == 'limit' and time_ex == None:
             raise InvalidOrder("Time to expiration must be specified for limit orders")
@@ -331,15 +315,27 @@ class radarrelay(Exchange):
             price = float('inf')
         elif style == 'market' and side == 'sell':
             price = 0
+        else:
+            price = pay_amount/buy_amount #price is quoted quote/base
+
+        ##COMMENTED OUT TO TEST CREATE_ORDER UNTIL GET_SYMBOL FXN IS READY
+        # symbol = self.get_symbol(buy_token) + '/' + self.get_symbol(pay_token)
+        # self.load_markets()
+        # market = self.market(symbol)
+        # base_precision = market['precision']['amountBase']
+        # quote_precision = market['precision']['amountQuote']
+        base_precision = 10**18
+        quote_precision = 10**18
+        symbol = ''
+        ##################################################
 
         self.order_bk = self.fetch_order_book(symbol, params={}, raw=True)
-        pending, leftover = self._analyze_orderbook(symbol, side, price, amount)
+        pending, leftover = self._analyze_orderbook(price, buy_amount, base_precision, quote_precision)
 
         if leftover != 0:
-            if side == 'buy':
-                response, order_hash = self._buy_post(symbol, leftover, price, time_ex, params)
-            elif side == 'sell':
-                response, order_hash = self._sell_post(symbol, leftover, price, time_ex, params)
+            leftover_pay = (leftover/buy_amount)*pay_amount*quote_precision
+            leftover = leftover*base_precision
+            response, order_hash = self._post_order(buy_token, leftover, pay_token, leftover_pay, time_ex)
         else:
             response, order_hash = '', ''
 
@@ -350,15 +346,7 @@ class radarrelay(Exchange):
         }
         return out
 
-    def _fill_order(self, amount, ticket):
-        pass
-
-    def _buy_post(self, symbol, amount, price, time_ex, params={}):
-        self.load_markets()
-        market = self.market(symbol)
-        takerAmount = amount*market['precision']['amountBase']
-        makerAmount = amount*price*market['precision']['amountQuote']
-
+    def _post_order(self, buy_token, leftover, pay_token, leftover_pay, time_ex):
         ##get exchangeContractAddress
         ##get salt
 
@@ -366,64 +354,35 @@ class radarrelay(Exchange):
             "exchangeContractAddress": "",
             "maker": self.wallet[0],
             "taker": "0x0000000000000000000000000000000000000000",
-            "makerTokenAddress": market['quoteTokenAddress'],
-            "takerTokenAddress": market['baseTokenAddress'],
-            "makerTokenAmount": str(makerAmount),
-            "takerTokenAmount": str(takerAmount),
+            "makerTokenAddress": pay_token,
+            "takerTokenAddress": buy_token,
+            "makerTokenAmount": leftover_pay,
+            "takerTokenAmount": leftover,
             "expirationUnixTimestampSec":str(self.milliseconds() + time_ex*60000),
             "salt": ""
         }
 
-        fees = self.public_post_fees(params, body=json.dumps(order)) ####error handling here
+        fees = self.public_post_fees(body=json.dumps(order)) ####error handling here
         order = self.extend(order, fees)
         order_hash = '0x12459c951127e0c374ff9105dda097662a027093' ###will be fxn
         sig = {} ##get signature
         order['ecSignature'] = sig
         ##validate order
 
-        out = self.public_post_order(params, body=json.dumps(order)) ###error handling
+        out = self.public_post_order(body=json.dumps(order)) ###error handling
         return out, order_hash
 
-    def _sell_post(self, symbol, amount, price, time_ex, params={}):
-        self.load_markets()
-        market = self.market(symbol)
+    def _fill_order(self, amount, ticket):
+        pass
 
-        makerAmount = amount*market['precision']['amountBase']
-        takerAmount = amount*price*market['precision']['amountQuote']
-
-        ##get exchangeContractAddress
-        ##get salt
-
-        order = {
-            "exchangeContractAddress": "",
-            "maker": self.wallet[0],
-            "taker": "0x0000000000000000000000000000000000000000",
-            "makerTokenAddress": market['baseTokenAddress'],
-            "takerTokenAddress": market['quoteTokenAddress'],
-            "makerTokenAmount": str(makerAmount),
-            "takerTokenAmount": str(takerAmount),
-            "expirationUnixTimestampSec":str(self.milliseconds + time_ex*60000),
-            "salt": ""
-        }
-
-        fees = self.public_post_fees(params, body=json.dumps(order)) ####error handling here
-        order = self.extend(order, fees)
-        order_hash = '0x12459c951127e0c374ff9105dda097662a027093' ###will be fxn
-        sig = {} ##get signature
-        order['ecSignature'] = sig
-        ##validate order
-
-        out = self.public_post_order(params, body=json.dumps(order)) ###error handling
-        return out, order_hash
+    def cancel_order(self, order_hash, params={}):
+        order = self.fetch_order(order_hash)
 
     def create_limit_buy_order(self, symbol, amount, price, time_ex):
         return self.create_order(symbol, 'limit', 'buy', amount=amount, price=price, time_ex=time_ex)
 
     def create_limit_sell_order(self, symbol, amount, price, time_ex):
         return self.create_order(symbol, 'limit', 'sell', amount=amount, price=price, time_ex=time_ex)
-
-    def cancel_order(self, order_id, params={}):
-        pass
 
     def sign(self, path, api='public', method='GET', params={}, headers=None, body=None):
         url = self.urls['api'][api]
