@@ -5,12 +5,22 @@ import json
 
 from ccxt.base.exchange import Exchange
 from ccxt.base.errors import BaseError, InvalidOrder
+from web3 import Web3
+from pymaker import Address
+from pymaker.zrx import ZrxExchange
+from pymaker.deployment import deploy_contract
+from pymaker.token import ERC20Token
 
 class radarrelay(Exchange):
 
     def __init__(self):
         super().__init__()
-        #self.exchange =
+
+        # self.web3 = Web3.HttpProvider('http://localhost:8545')
+        #
+        # zrx_token = ERC20Token(web3=self.web3, address=deploy_contract(self.web3, 'ZRXToken'))
+        # trans_proxy = deploy_contract(self.web3, 'TokenTransferProxy')
+        # self.zrx = ZrxExchange.deploy(web3, zrx_token, trans_proxy)
 
 
     def describe(self):
@@ -75,6 +85,10 @@ class radarrelay(Exchange):
         return "test"
 
     def fetch_markets(self):
+        '''
+        As a rule TokenA is quote currency and TokenB is the base currency.
+        '''
+
         response = self.public_get_token_pairs()
         result = []
         for pair in response:
@@ -186,24 +200,33 @@ class radarrelay(Exchange):
         return self.parse_order(response)
 
     def fetch_orders(self, symbol=None, params={}):
-        self.check_wallet()
+        '''
+        Refactor to be a summation of fetch_open_orders and fetch_closed_orders.
+        '''
 
-        if symbol is None:
-            request = {'trader': self.wallet[0]}
-        else:
-            self.load_markets()
-            market = self.market(symbol)
-            request = {
-                'trader': self.wallet[0],
-                'tokenA': market['baseTokenAddress'],
-                'tokenB': market['quoteTokenAddress']
-            }
-
-        response = self.public_get_orders(self.extend(request, params))
-        orders =[self.parse_order(order, symbol) for order in response]
-        return orders
+        # self.check_wallet()
+        #
+        # if symbol is None:
+        #     request = {'trader': self.wallet[0]}
+        # else:
+        #     self.load_markets()
+        #     market = self.market(symbol)
+        #     request = {
+        #         'trader': self.wallet[0],
+        #         'tokenA': market['quoteTokenAddress'],
+        #         'tokenB': market['baseTokenAddress']
+        #     }
+        #
+        # response = self.public_get_orders(self.extend(request, params))
+        # orders =[self.parse_order(order, symbol) for order in response]
+        # return orders
+        pass
 
     def fetch_open_orders(self, symbol=None, params={}):
+        '''
+        Fetches all orders currently in RadarRelay's system. Including pending
+        orders that haven't been confirmed on chain.
+        '''
         self.check_wallet()
 
         if symbol is None:
@@ -213,39 +236,50 @@ class radarrelay(Exchange):
             market = self.market(symbol)
             request = {
                 'trader': self.wallet[0],
-                'tokenA': market['baseTokenAddress'],
-                'tokenB': market['quoteTokenAddress']
+                'tokenA': market['quoteTokenAddress'],
+                'tokenB': market['baseTokenAddress']
             }
 
         response = self.public_get_orders(self.extend(request, params))
-        out = []
-        empty = "0x0000000000000000000000000000000000000000"
-        for order in response:
-            if order['maker'] == empty or order['taker'] == empty:
-                out.append(self.parse_order(order, symbol))
-        return out
+        #orders = []
+        #empty = "0x0000000000000000000000000000000000000000"
+        #for order in response:
+            # if order['maker'] == empty or order['taker'] == empty:
+            #     orders.append(self.parse_order(order, symbol))
+        orders = [self.parse_order(order,symbol) for order in response]
+        return orders
+
+    def fetch_my_trades(self, symbol, params={}):
+        '''
+        Fetches all trades executed from all wallets.
+        '''
+        pass
 
     def fetch_closed_orders(self, symbol=None, params={}):
-        self.check_wallet()
-
-        if symbol is None:
-            request = {'trader': self.wallet[0]}
-        else:
-            self.load_markets()
-            market = self.market(symbol)
-            request = {
-                'trader': self.wallet[0],
-                'tokenA': market['baseTokenAddress'],
-                'tokenB': market['quoteTokenAddress']
-            }
-
-        response = self.public_get_orders(self.extend(request, params))
-        out = []
-        empty = "0x0000000000000000000000000000000000000000"
-        for order in response:
-            if (order['maker'] != empty and order['taker'] == self.wallet[0]) or (order['taker'] != empty and order['maker'] == self.wallet[0]):
-                out.append(self.parse_order(order, symbol))
-        return out
+        '''
+        Fetches all canceled and expired orders.
+        '''
+        # self.check_wallet()
+        #
+        # if symbol is None:
+        #     request = {'trader': self.wallet[0]}
+        # else:
+        #     self.load_markets()
+        #     market = self.market(symbol)
+        #     request = {
+        #         'trader': self.wallet[0],
+        #         'tokenA': market['quoteTokenAddress'],
+        #         'tokenB': market['baseTokenAddress']
+        #     }
+        #
+        # response = self.public_get_orders(self.extend(request, params))
+        # out = []
+        # empty = "0x0000000000000000000000000000000000000000"
+        # for order in response:
+        #     if (order['maker'] != empty and order['taker'] == self.wallet[0]) or (order['taker'] != empty and order['maker'] == self.wallet[0]):
+        #         out.append(self.parse_order(order, symbol))
+        # return out
+        pass
 
     def _analyze_orderbook(self, symbol, side, price, amount):
         self.load_markets()
