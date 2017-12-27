@@ -162,7 +162,7 @@ class TestRadarRelayOrderExecution(TestCase):
         self.exchange._fill_order.assert_not_called()
 
     @patch('radarrelay.radarrelay._fill_order')
-    def test_analyze_orderbook2_partial_fill(self, mock_fill):
+    def test_analyze_orderbook_partial_fill(self, mock_fill):
         with open(os.getcwd() +'/orderbook_data.json') as order_data:
             self.exchange.order_bk = json.load(order_data)
 
@@ -174,7 +174,7 @@ class TestRadarRelayOrderExecution(TestCase):
         self.exchange._fill_order.assert_called_with(10000*(10**18), self.exchange.order_bk['asks'][-1])
 
     @patch('radarrelay.radarrelay._fill_order')
-    def test_analyze_orderbook2_market(self, mock_fill):
+    def test_analyze_orderbook_market(self, mock_fill):
         with open(os.getcwd() +'/orderbook_data.json') as order_data:
             self.exchange.order_bk = json.load(order_data)
 
@@ -213,6 +213,7 @@ class TestRadarRelayOrderExecution(TestCase):
 
         order = self.exchange.create_order('limit', '0x2956356cd2a2bf3202f771f50d3d14a367b48070', 0.258, '0x8f8221afbb33998d8584a2b05749ba73c37a938a', 2000, time_ex=1)
 
+        self.exchange._analyze_orderbook.assert_called_with((2000/0.258), 0.258, 10**18, 10**18)
         self.exchange._post_order.assert_not_called()
         self.assertEqual(order, output)
 
@@ -229,6 +230,7 @@ class TestRadarRelayOrderExecution(TestCase):
 
         order = self.exchange.create_order('limit', '0x2956356cd2a2bf3202f771f50d3d14a367b48070', 0.3, '0x8f8221afbb33998d8584a2b05749ba73c37a938a', 2000, time_ex=1)
 
+        self.exchange._analyze_orderbook.assert_called_with((2000/0.3), 0.3, 10**18, 10**18)
         self.exchange._post_order.assert_called_with('0x2956356cd2a2bf3202f771f50d3d14a367b48070', 0.3*(10**18), '0x8f8221afbb33998d8584a2b05749ba73c37a938a', 2000*(10**18), 1)
         self.assertEqual(order, output)
 
@@ -245,6 +247,7 @@ class TestRadarRelayOrderExecution(TestCase):
 
         order = self.exchange.create_order('limit', '0x8f8221afbb33998d8584a2b05749ba73c37a938a', 15000, '0x2956356cd2a2bf3202f771f50d3d14a367b48070', 2.64, time_ex=1)
 
+        self.exchange._analyze_orderbook.assert_called_with((2.64/15000), 15000, 10**18, 10**18)
         self.exchange._post_order.assert_called_with('0x8f8221afbb33998d8584a2b05749ba73c37a938a', 5000*(10**18), '0x2956356cd2a2bf3202f771f50d3d14a367b48070', 0.88*(10**18), 1)
         self.assertEqual(order, output)
 
